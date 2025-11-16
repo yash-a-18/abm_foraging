@@ -34,6 +34,7 @@ def portrayal_method(obj):
         portrayal["w"] = RESOURCE_SIZE
         portrayal["h"] = RESOURCE_SIZE
         portrayal["Layer"] = 0
+        portrayal["Filled"] = "true"
         rtype = getattr(obj, "resource_type", None)
         if rtype == "plants":
             portrayal["Color"] = "lightgreen"

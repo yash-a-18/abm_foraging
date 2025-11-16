@@ -61,20 +61,20 @@ class ForageModel(Model):
             y = self.random.randrange(self.grid.height)
             self.grid.place_agent(agent, (x, y))
 
-        # Data collector
+        # Data collector - FIXED to only count ForagerAgent objects
         self.datacollector = DataCollector(
             model_reporters={
-                "Alive": lambda m: sum(a.is_alive() for a in m.schedule.agents),
-                "Dead": lambda m: sum(a.status=="dead" for a in m.schedule.agents),
-                "Injured": lambda m: sum(a.status=="injured" for a in m.schedule.agents),
-                "MeanEnergy": lambda m: (sum(a.energy for a in m.schedule.agents if a.is_alive()) / 
-                                        max(1, sum(a.is_alive() for a in m.schedule.agents)))
+                "Alive": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.is_alive()),
+                "Dead": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.status == "dead"),
+                "Injured": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.status == "injured"),
+                "MeanEnergy": lambda m: (sum(a.energy for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.is_alive()) / 
+                                        max(1, sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.is_alive())))
             },
             agent_reporters={
-                "Energy": lambda a: getattr(a, "energy", None),
-                "Status": lambda a: getattr(a, "status", None),
-                "ForagingSkill": lambda a: getattr(a, "foraging_skill", None),
-                "HuntingSkill": lambda a: getattr(a, "hunting_skill", None),
+                "Energy": lambda a: getattr(a, "energy", None) if isinstance(a, ForagerAgent) else None,
+                "Status": lambda a: getattr(a, "status", None) if isinstance(a, ForagerAgent) else None,
+                "ForagingSkill": lambda a: getattr(a, "foraging_skill", None) if isinstance(a, ForagerAgent) else None,
+                "HuntingSkill": lambda a: getattr(a, "hunting_skill", None) if isinstance(a, ForagerAgent) else None,
             }
         )
 
@@ -108,6 +108,8 @@ class ForageModel(Model):
         # 2) Step through scheduled agents (random activation)
         # 3) Collect data
         # 4) Clean up fully depleted resource patches
+        # 5) Check if all agents are dead and stop if so
+        
         # 1) spawn
         for x in range(self.grid.width):
             for y in range(self.grid.height):
@@ -119,14 +121,19 @@ class ForageModel(Model):
         # 3) collect data
         self.datacollector.collect(self)
 
-        # 4) cleanup dead markers and depleted patches
+        # 4) cleanup dead agents and depleted patches
         self.cleanup_dead_agents_and_depleted_resources()
+        
+        # 5) check if all agents are dead
+        alive_count = sum(1 for a in self.schedule.agents if isinstance(a, ForagerAgent) and a.is_alive())
+        if alive_count == 0:
+            self.running = False
 
     def cleanup_dead_agents_and_depleted_resources(self):
         # remove dead agents from grid and schedule (but keep them in schedule.agents so DataCollector works; Mesa's scheduler doesn't typically remove)
         # For simplicity, we'll not remove dead from schedule.agents, but we'll try removing from grid cells so they don't clutter visuals.
         for agent in list(self.schedule.agents):
-            if getattr(agent, "status", None) == "dead":
+            if isinstance(agent, ForagerAgent) and agent.status == "dead":
                 # attempt to remove from grid
                 try:
                     if agent.pos is not None:
