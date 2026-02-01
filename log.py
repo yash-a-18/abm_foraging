@@ -9,17 +9,17 @@ LOG_PATH = Path(r".\simulation_log.csv")
 LOG_PATH.parent.mkdir(exist_ok=True)
 
 # --- INITIAL CSV STRUCTURE ---
-# Added "Event" so event-based logging works
+# Aligning these exactly with the keys used in model.py record_event
 sample_data = {
     "RunID": [],
     "Step": [],
     "AgentID": [],
-    "Sex": [],
     "Status": [],
     "Energy": [],
-    "Activity": [],
     "Position": [],
-    "Event": []        # <-- NEW COLUMN
+    "Event": [],
+    "Reasoning": [],     # Matches model.py
+    "DeathCause": []     # Matches model.py
 }
 
 df = pd.DataFrame(sample_data)
@@ -28,6 +28,5 @@ df = pd.DataFrame(sample_data)
 if not LOG_PATH.exists():
     df.to_csv(LOG_PATH, index=False)
 
-# Expose LOG_PATH to import from other files
 def get_log_path():
     return LOG_PATH

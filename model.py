@@ -6,16 +6,13 @@ from mesa.datacollection import DataCollector
 from agents import ForagerAgent, ResourcePatch
 import random
 import itertools
-
 import config
-
 import pandas as pd
-from log import get_log_path  # use shared log path from log.py
-
+from log import get_log_path
 
 class ForageModel(Model):
     """
-    Mesa Model for foraging/hunting simulation.
+    Mesa Model for foraging/hunting simulation simulating older times.
     """
     def __init__(self,
                  width=config.GRID_WIDTH,
@@ -29,95 +26,41 @@ class ForageModel(Model):
                  max_weak_days=config.MAX_WEAK_DAYS,
                  activity_costs=config.ACTIVITY_COSTS):
         super().__init__()
+        self.event_history = []
         self.width = width
         self.height = height
         self.grid = MultiGrid(width, height, torus=True)
         self.schedule = RandomActivation(self)
         self.next_resource_id = itertools.count(1000000)
         self.next_agent_id = itertools.count(1)
-        self.initial_population = initial_population
-
-        # Model-level editable params
+        
+        # Model Parameters
         self.resource_defs = resource_defs
         self.spawn_probs = spawn_probs
         self.activities = activities
         self.starting_energy = starting_energy
         self.daily_requirement = daily_requirement
         self.max_weak_days = max_weak_days
-        self.activity_costs = activity_costs
-
-        # Run identifier so you can distinguish runs in the log
         self.run_id = random.randint(100000, 999999)
 
-        # Tracking
-        self.initial_agents_count = initial_population
-        self.dead_count = 0
-        self.injured_count = 0
-
-        # Create agents
-        for i in range(self.initial_population):
+        # Create agents with the simplified __init__
+        for i in range(initial_population):
             aid = next(self.next_agent_id)
-            for_skill = self.random.randint(0, 4)
-            hunt_skill = self.random.randint(0, 8)
-            agent = ForagerAgent(
-                aid,
-                self,
-                name=f"Agent_{aid}",
-                foraging_skill=for_skill,
-                hunting_skill=hunt_skill
-            )
-            agent.energy = self.starting_energy
-            # agent.last_logged_state is already initialized in ForagerAgent.__init__
+            agent = ForagerAgent(aid, self, name=f"Agent_{aid}")
             self.schedule.add(agent)
             x = self.random.randrange(self.grid.width)
             y = self.random.randrange(self.grid.height)
             self.grid.place_agent(agent, (x, y))
 
-        # Data collector
         self.datacollector = DataCollector(
             model_reporters={
-                "Alive": lambda m: sum(
-                    1 for a in m.schedule.agents
-                    if isinstance(a, ForagerAgent) and a.is_alive()
-                ),
-                "Dead": lambda m: sum(
-                    1 for a in m.schedule.agents
-                    if isinstance(a, ForagerAgent) and a.status == "dead"
-                ),
-                "Injured": lambda m: sum(
-                    1 for a in m.schedule.agents
-                    if isinstance(a, ForagerAgent) and a.status == "injured"
-                ),
-                "MeanEnergy": lambda m: (
-                    sum(
-                        a.energy for a in m.schedule.agents
-                        if isinstance(a, ForagerAgent) and a.is_alive()
-                    ) /
-                    max(
-                        1,
-                        sum(
-                            1 for a in m.schedule.agents
-                            if isinstance(a, ForagerAgent) and a.is_alive()
-                        )
-                    )
-                )
-            },
-            agent_reporters={
-                "Energy": lambda a: getattr(a, "energy", None)
-                if isinstance(a, ForagerAgent) else None,
-                "Status": lambda a: getattr(a, "status", None)
-                if isinstance(a, ForagerAgent) else None,
-                "ForagingSkill": lambda a: getattr(a, "foraging_skill", None)
-                if isinstance(a, ForagerAgent) else None,
-                "HuntingSkill": lambda a: getattr(a, "hunting_skill", None)
-                if isinstance(a, ForagerAgent) else None,
+                "Alive": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.status != "dead"),
+                "Dead": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.status == "dead"),
+                "Injured": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, ForagerAgent) and a.status == "injured"),
             }
         )
 
-        # Spawn initial resources
         self.spawn_resources_initial()
-
-    # ---------- RESOURCE SPAWNING ----------
 
     def spawn_resources_initial(self):
         for x in range(self.grid.width):
@@ -126,8 +69,7 @@ class ForageModel(Model):
 
     def try_spawn_patch(self, pos):
         cell_contents = self.grid.get_cell_list_contents([pos])
-        existing = any(isinstance(obj, ResourcePatch) for obj in cell_contents)
-        if existing:
+        if any(isinstance(obj, ResourcePatch) for obj in cell_contents):
             return
         for rtype, prob in self.spawn_probs.items():
             if self.random.random() < prob:
@@ -135,34 +77,27 @@ class ForageModel(Model):
                 patch = ResourcePatch(rid, self, rtype)
                 self.grid.place_agent(patch, pos)
                 self.schedule.add(patch)
-                return
-
-    # ---------- EVENT LOGGING API ----------
+                break
 
     def record_event(self, step, agent, event_text):
-        """
-        Called by agents when something meaningful happens.
-        Writes a single row to the shared CSV log defined in log.py.
-        """
         log_path = get_log_path()
-
         row = {
             "RunID": self.run_id,
             "Step": step,
             "AgentID": agent.unique_id,
-            "Sex": getattr(agent, "sex", "unknown"),
             "Status": agent.status,
             "Energy": round(agent.energy, 2),
-            "Activity": getattr(agent, "activity", None),  # will be None unless you add it in the agent
             "Position": str(agent.pos),
             "Event": event_text,
+            "Reasoning": getattr(agent, "reasoning", ""),
+            "DeathCause": getattr(agent, "cause_of_death", "")
         }
+        pd.DataFrame([row]).to_csv(log_path, mode="a", header=False, index=False)
 
-        df = pd.DataFrame([row])
-        # Header already created in log.py, so header=False here
-        df.to_csv(log_path, mode="a", header=False, index=False)
-
-    # ---------- MAIN STEP LOOP ----------
+        # Add to UI history
+        reason = getattr(agent, "reasoning", "")
+        log_msg = f"Step {step}: Agent {agent.unique_id} - {event_text} ({reason})"
+        self.event_history.append(log_msg)
 
     def step(self):
         # 1. Spawn new resources
@@ -171,41 +106,15 @@ class ForageModel(Model):
                 self.try_spawn_patch((x, y))
 
         # 2. Let agents act
-        self.schedule.step()  # agents call record_event() themselves when needed
+        self.schedule.step()
+
+        # Log active agents only
+        for agent in self.schedule.agents:
+            if isinstance(agent, ForagerAgent) and agent.status != "dead":
+                self.record_event(self.schedule.steps, agent, "Step Update")
 
         # 3. Collect model- and agent-level summary stats
         self.datacollector.collect(self)
-
-        # 4. Clean up depleted resources / dead agents
-        self.cleanup_dead_agents_and_depleted_resources()
-
-        # 5. Stop if everyone is dead
-        alive_count = sum(
-            1 for a in self.schedule.agents
-            if isinstance(a, ForagerAgent) and a.is_alive()
-        )
-        if alive_count == 0:
+        
+        if sum(1 for a in self.schedule.agents if isinstance(a, ForagerAgent) and a.status != "dead") == 0:
             self.running = False
-
-    def cleanup_dead_agents_and_depleted_resources(self):
-        # Remove dead agents from grid
-        for agent in list(self.schedule.agents):
-            if isinstance(agent, ForagerAgent) and agent.status == "dead":
-                try:
-                    if agent.pos is not None:
-                        self.grid.remove_agent(agent)
-                except Exception:
-                    pass
-
-        # Remove depleted resource patches
-        for obj in list(self.schedule.agents):
-            if isinstance(obj, ResourcePatch) and obj.amount <= 0:
-                try:
-                    if obj.pos is not None:
-                        self.grid.remove_agent(obj)
-                except Exception:
-                    pass
-                try:
-                    self.schedule.remove(obj)
-                except Exception:
-                    pass
