@@ -10,12 +10,22 @@ class StatusLogElement(TextElement):
     def __init__(self):
         pass
     def render(self, model):
-        # Retrieve the last 5 events from the model's history
-        events = model.event_history[-5:] if hasattr(model, 'event_history') else []
-        log_html = "<div style='border:1px solid #ccc; padding:10px; background:#f9f9f9;'>"
-        log_html += "<h4>Live Status Log</h4><ul style='list-style-type:none; padding:0;'>"
+        events = getattr(model, 'event_history', [])
+        
+        # Use a scrollable div so the list of agents doesn't push the charts away
+        log_html = """
+        <div style='border:1px solid #ccc; padding:10px; background:#f9f9f9; 
+                    height:350px; overflow-y:auto; font-family:monospace;'>
+            <ul style='list-style-type:none; padding:0; margin:0;'>
+        """
+        # Show newest summaries at the top
         for e in reversed(events):
-            log_html += f"<li style='margin-bottom:5px; border-bottom:1px solid #eee;'>{e}</li>"
+            # Make Step headers bold for visual clarity
+            if "--- Step" in e:
+                log_html += f"<li style='margin-top:10px; border-bottom:2px solid #333; font-weight:bold;'>{e}</li>"
+            else:
+                log_html += f"<li style='margin-bottom:2px; border-bottom:1px solid #eee; font-size:11px;'>{e}</li>"
+        
         log_html += "</ul></div>"
         return log_html
 
@@ -57,9 +67,38 @@ def portrayal_method(obj):
             portrayal["Shape"] = "resources/bear.png"
             
         return portrayal
+    
+# server.py (Add this new element)
+
+class StatsTableElement(TextElement):
+    def render(self, model):
+        table_html = """
+        <table style='width:100%; border-collapse: collapse; font-family:sans-serif; font-size:12px;'>
+            <tr style='background:#ddd;'>
+                <th>Agent</th><th>Energy</th><th>Status</th><th>P</th><th>S</th><th>L</th>
+            </tr>
+        """
+        for agent in model.schedule.agents:
+            if isinstance(agent, ForagerAgent):
+                # Color code status
+                color = "black" if agent.status == "dead" else "green" if agent.status == "healthy" else "orange"
+                
+                table_html += f"""
+                <tr>
+                    <td>{agent.unique_id}</td>
+                    <td>{int(agent.energy)}</td>
+                    <td style='color:{color};'>{agent.status}</td>
+                    <td>{agent.consumption_stats['plants']}</td>
+                    <td>{agent.consumption_stats['small_game']}</td>
+                    <td>{agent.consumption_stats['large_game']}</td>
+                </tr>
+                """
+        table_html += "</table>"
+        return table_html
 
 # UI Layout
 status_log = StatusLogElement()
+stats_table = StatsTableElement()
 grid = CanvasGrid(portrayal_method, config.GRID_WIDTH, config.GRID_HEIGHT, 500, 500)
 chart = ChartModule([
     {"Label": "Alive", "Color": "Green"},
@@ -70,7 +109,7 @@ chart = ChartModule([
 
 server = ModularServer(
     ForageModel, 
-    [grid, status_log, chart], # Added status_log here
+    [grid, status_log, stats_table, chart], # Added status_log and stats_table here
     "Foraging Survival Sim", 
     {}
 )

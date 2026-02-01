@@ -117,7 +117,20 @@ class ForageModel(Model):
         # Log active agents only
         for agent in self.schedule.agents:
             if isinstance(agent, ForagerAgent) and agent.status != "dead":
+                # Record to CSV for full data analysis
                 self.record_event(self.schedule.steps, agent, "Step Update")
+                
+                # Format a summary string for the UI Status Log
+                stats = agent.consumption_stats
+                agent_summary = (
+                    f"Agent {agent.unique_id}: Energy {int(agent.energy)} | "
+                    f"Status: {agent.status} | "
+                    f"Harvested: [P:{stats['plants']}, S:{stats['small_game']}, L:{stats['large_game']}]"
+                )
+                self.event_history.append(agent_summary)
+
+        summary_msg = f"--- Step {self.schedule.steps} Summary ---"
+        self.event_history.append(summary_msg)
 
         # 3. Collect model- and agent-level summary stats
         self.datacollector.collect(self)
