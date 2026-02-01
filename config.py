@@ -5,16 +5,26 @@ All defaults chosen for a sensible starter model — edit freely.
 """
 
 # Grid / simulation
-GRID_WIDTH = 10
-GRID_HEIGHT = 10
-INITIAL_POPULATION = 100
-STEPS_PER_RUN = 200
+GRID_WIDTH = 100
+GRID_HEIGHT = 100
+INITIAL_POPULATION = 150 # Can be a dunbar number
+STEPS_PER_RUN = 200 # 10000 * 365 # Or certain generations (50 generations i.e., 1000-2000 years)
+INITIAL_STRATEGY = ["gather", "hunt_small", "hunt_large"] 
 
 # Energy / survival
-STARTING_ENERGY = 2000         # initial kcal per agent
-DAILY_REQUIREMENT = 2000       # kcal required per day to avoid becoming weak
-MAX_WEAK_DAYS = 2              # number of consecutive days below threshold before death
+STARTING_ENERGY = 2000         # initial kcal per agent 
+ENERGY_BANK = 5000            # after this threshold, maybe they can reproduce
+DAILY_REQUIREMENT = 100       # kcal required per day to avoid becoming weak
+MAX_WEAK_DAYS = 10              # number of consecutive days below threshold before death
+# Die with starvation or natural death(old age)!
 
+# Shared energy bank b/w 2 agents
+# attempt gather get 100 with +/-10 variance (90,110)
+# attempt hunt get 90 with +/-50 variance (40,140)
+
+# After every 9 months, we can have a check for reproduction
+
+"""Can be removed for the simulation"""
 # Activity energy costs (kcal) -- energy spent while attempting an activity (in addition to daily consumption)
 ACTIVITY_COSTS = {
     "plants": 150,
@@ -22,13 +32,15 @@ ACTIVITY_COSTS = {
     "large_game": 600,
 }
 
+# Keep the resources constant
 # Resource spawn probabilities (per empty cell per step)
 RESOURCE_SPAWN_PROBS = {
-    "plants": 0.20,
-    "small_game": 0.06,
-    "large_game": 0.015,
+    "plants": 0.0,
+    "small_game": 0.0,
+    "large_game": 0.0,
 }
 
+# Normal Distribution Parameters for Resource Returns
 # Resource type defaults (mean, variance, skill requirement, package size, risk injury, risk death, injury_days)
 RESOURCE_DEFS = {
     "plants": {
