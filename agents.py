@@ -23,6 +23,12 @@ class ForagerAgent(Agent):
         self.injury_days_remaining = 0
         self.cause_of_death = None
         self.reasoning = "Searching for resources."
+        # Cumulative consumption tracker
+        self.consumption_stats = {
+            "plants": 0,
+            "small_game": 0,
+            "large_game": 0
+        }
 
     def step(self):
         if self.status == "dead":
@@ -86,6 +92,8 @@ class ForagerAgent(Agent):
             # Success!
             gain = max(0, random.normalvariate(config["mean"], config["variance"]))
             self.energy += gain
+            # Increment the count for the specific resource type
+            self.consumption_stats[patch.resource_type] += 1
             # Resource disappears after consumption
             self.model.grid.remove_agent(patch)
             self.model.schedule.remove(patch)

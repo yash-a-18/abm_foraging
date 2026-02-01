@@ -19,7 +19,8 @@ sample_data = {
     "Position": [],
     "Event": [],
     "Reasoning": [],     # Matches model.py
-    "DeathCause": []     # Matches model.py
+    "DeathCause": [],
+    "Stats": []
 }
 
 df = pd.DataFrame(sample_data)

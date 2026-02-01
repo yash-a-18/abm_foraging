@@ -81,6 +81,9 @@ class ForageModel(Model):
 
     def record_event(self, step, agent, event_text):
         log_path = get_log_path()
+
+        stats = agent.consumption_stats
+        stats_str = f"P:{stats['plants']} | S:{stats['small_game']} | L:{stats['large_game']}"
         row = {
             "RunID": self.run_id,
             "Step": step,
@@ -90,13 +93,16 @@ class ForageModel(Model):
             "Position": str(agent.pos),
             "Event": event_text,
             "Reasoning": getattr(agent, "reasoning", ""),
-            "DeathCause": getattr(agent, "cause_of_death", "")
+            "DeathCause": getattr(agent, "cause_of_death", ""),
+            "Stats": stats_str
         }
         pd.DataFrame([row]).to_csv(log_path, mode="a", header=False, index=False)
 
         # Add to UI history
         reason = getattr(agent, "reasoning", "")
-        log_msg = f"Step {step}: Agent {agent.unique_id} - {event_text} ({reason})"
+        log_msg = (f"Step {step}: Agent {agent.unique_id} - {event_text} | "
+                   f"Stats: [{stats_str}] | "
+                   f"Reasoning: {reason}")
         self.event_history.append(log_msg)
 
     def step(self):

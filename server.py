@@ -64,7 +64,8 @@ grid = CanvasGrid(portrayal_method, config.GRID_WIDTH, config.GRID_HEIGHT, 500, 
 chart = ChartModule([
     {"Label": "Alive", "Color": "Green"},
     {"Label": "Injured", "Color": "Orange"},
-    {"Label": "Dead", "Color": "Red"}
+    {"Label": "Dead", "Color": "Red"},
+    {"Label": "Mean Energy", "Color": "Blue"}
 ])
 
 server = ModularServer(
